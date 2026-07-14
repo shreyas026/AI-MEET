@@ -73,6 +73,17 @@ function getMediaContentType(blob: Blob, extension: string): string {
   return byExt[extension] ?? "application/octet-stream";
 }
 
+function getSupportedRecordingOptions(): MediaRecorderOptions | undefined {
+  const supportedType = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/ogg;codecs=opus",
+  ].find((type) => MediaRecorder.isTypeSupported(type));
+
+  return supportedType ? { mimeType: supportedType } : undefined;
+}
+
 function NewMeeting() {
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
@@ -110,22 +121,36 @@ function NewMeeting() {
 
   async function startRecording() {
     try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+        toast.error("Recording is not supported in this browser");
+        return;
+      }
+
+      setRecordedBlob(null);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
-        : "audio/mp4";
-      const mr = new MediaRecorder(stream, { mimeType });
+      const recordingOptions = getSupportedRecordingOptions();
+      const mr = new MediaRecorder(stream, recordingOptions);
       chunksRef.current = [];
       mr.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       mr.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const blob = new Blob(chunksRef.current, {
+          type: mr.mimeType || recordingOptions?.mimeType || "audio/webm",
+        });
+        if (blob.size === 0) {
+          setRecordedBlob(null);
+          toast.error("Recording was empty. Please try again.");
+          return;
+        }
         setRecordedBlob(blob);
         streamRef.current?.getTracks().forEach((t) => t.stop());
       };
-      mr.start();
+      mr.onerror = () => {
+        toast.error("Recording failed. Please check microphone permission and try again.");
+      };
+      mr.start(1000);
       recorderRef.current = mr;
       setRecording(true);
       setElapsed(0);
@@ -136,13 +161,17 @@ function NewMeeting() {
   }
 
   function stopRecording() {
-    recorderRef.current?.stop();
+    if (recorderRef.current?.state === "recording") {
+      recorderRef.current.requestData();
+      recorderRef.current.stop();
+    }
     setRecording(false);
     if (timerRef.current) clearInterval(timerRef.current);
   }
 
   async function submit() {
     if (!title.trim()) return toast.error("Please give the meeting a title");
+    if (recording) return toast.error("Please stop the recording before transcribing");
     const audioBlob = mode === "record" ? recordedBlob : file;
     if (!audioBlob) return toast.error("Please attach audio or video to transcribe");
 
