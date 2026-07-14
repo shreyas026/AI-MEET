@@ -27,6 +27,52 @@ export const Route = createFileRoute("/_authenticated/meetings/new")({
   component: NewMeeting,
 });
 
+const FALLBACK_EXTENSION = "webm";
+
+function getMediaExtension(blob: Blob): string {
+  if (blob instanceof File) {
+    const extension = blob.name.split(".").pop()?.toLowerCase();
+    if (extension) return extension;
+  }
+
+  const subtype = blob.type.split("/")[1]?.split(";")[0]?.toLowerCase();
+  if (!subtype) return FALLBACK_EXTENSION;
+
+  const normalized: Record<string, string> = {
+    mpeg: "mp3",
+    quicktime: "mov",
+    "x-msvideo": "avi",
+    "x-matroska": "mkv",
+    "3gpp": "3gp",
+    "3gpp2": "3g2",
+  };
+
+  return normalized[subtype] ?? subtype;
+}
+
+function getMediaContentType(blob: Blob, extension: string): string {
+  if (blob.type) return blob.type;
+
+  const byExt: Record<string, string> = {
+    mp3: "audio/mpeg",
+    wav: "audio/wav",
+    m4a: "audio/mp4",
+    aac: "audio/aac",
+    flac: "audio/flac",
+    ogg: "audio/ogg",
+    webm: "video/webm",
+    mp4: "video/mp4",
+    m4v: "video/mp4",
+    mov: "video/quicktime",
+    avi: "video/x-msvideo",
+    mkv: "video/x-matroska",
+    "3gp": "video/3gpp",
+    "3g2": "video/3gpp2",
+  };
+
+  return byExt[extension] ?? "application/octet-stream";
+}
+
 function NewMeeting() {
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
@@ -98,7 +144,7 @@ function NewMeeting() {
   async function submit() {
     if (!title.trim()) return toast.error("Please give the meeting a title");
     const audioBlob = mode === "record" ? recordedBlob : file;
-    if (!audioBlob) return toast.error("Please attach audio to transcribe");
+    if (!audioBlob) return toast.error("Please attach audio or video to transcribe");
 
     setBusy(true);
     try {
@@ -111,28 +157,18 @@ function NewMeeting() {
         },
       });
 
-      // Upload audio to storage
-      setStep("Uploading audio…");
+      // Upload media to storage
+      setStep("Uploading media...");
       const wsData = await supabase.auth.getUser();
       const uid = wsData.data.user?.id;
       if (!uid) throw new Error("No user");
       // Derive extension from blob type
-      const ext =
-        (audioBlob as File).name?.split(".").pop() ||
-        (audioBlob.type.includes("webm")
-          ? "webm"
-          : audioBlob.type.includes("mp4")
-            ? "m4a"
-            : audioBlob.type.includes("wav")
-              ? "wav"
-              : audioBlob.type.includes("mpeg")
-                ? "mp3"
-                : "webm");
-      const path = `${meeting.workspace_id}/${meeting.id}/audio.${ext}`;
+      const ext = getMediaExtension(audioBlob);
+      const path = `${meeting.workspace_id}/${meeting.id}/media.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("meeting-audio")
         .upload(path, audioBlob, {
-          contentType: audioBlob.type || `audio/${ext}`,
+          contentType: getMediaContentType(audioBlob, ext),
           upsert: true,
         });
       if (upErr) throw upErr;
@@ -168,7 +204,7 @@ function NewMeeting() {
     <>
       <PageHeader
         title="New meeting"
-        description="Record live or upload audio. AI Meeting Operator handles the rest."
+        description="Record live or upload audio or video. AI Meeting Operator handles the rest."
       />
       <PageBody>
         <Card className="mx-auto max-w-2xl p-6">
@@ -202,7 +238,7 @@ function NewMeeting() {
             </div>
 
             <div>
-              <Label>Audio source</Label>
+              <Label>Meeting source</Label>
               <Tabs value={mode} onValueChange={(v) => setMode(v as any)}>
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="upload" disabled={busy}>
@@ -216,11 +252,11 @@ function NewMeeting() {
                   <div className="rounded-lg border-2 border-dashed border-border bg-secondary/40 p-8 text-center">
                     <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
                     <p className="mt-3 text-sm text-muted-foreground">
-                      Drop an mp3, wav, m4a, or webm file
+                      Drop an audio or video file
                     </p>
                     <Input
                       type="file"
-                      accept="audio/*"
+                      accept="audio/*,video/*"
                       className="mx-auto mt-4 max-w-xs"
                       onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                       disabled={busy}

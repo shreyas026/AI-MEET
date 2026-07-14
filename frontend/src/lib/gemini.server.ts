@@ -48,6 +48,15 @@ function mimeTypeFromFilename(filename: string, fallback: string): string {
     m4a: "audio/mp4",
     webm: "audio/webm",
     ogg: "audio/ogg",
+    aac: "audio/aac",
+    flac: "audio/flac",
+    mp4: "video/mp4",
+    m4v: "video/mp4",
+    mov: "video/quicktime",
+    avi: "video/x-msvideo",
+    mkv: "video/x-matroska",
+    "3gp": "video/3gpp",
+    "3g2": "video/3gpp2",
   };
   return (ext && byExt[ext]) || fallback || "audio/webm";
 }
@@ -74,7 +83,7 @@ function normalizeVector(values: number[]): number[] {
 export async function transcribeAudioBlob(audio: Blob, filename: string): Promise<string> {
   const { apiKey, baseUrl, transcriptionModel } = getGeminiConfig();
   if (audio.size > 18 * 1024 * 1024) {
-    throw new Error("Gemini inline audio limit is about 20 MB. Please upload a shorter recording.");
+    throw new Error("Gemini inline media limit is about 20 MB. Please upload a shorter recording.");
   }
 
   const audioBase64 = Buffer.from(await audio.arrayBuffer()).toString("base64");
@@ -91,7 +100,7 @@ export async function transcribeAudioBlob(audio: Blob, filename: string): Promis
             parts: [
               {
                 text:
-                  "Transcribe this meeting audio accurately. Return only the transcript text, with no markdown or summary.",
+                  "Transcribe the spoken meeting content in this media accurately. Return only the transcript text, with no markdown or summary.",
               },
               { inlineData: { mimeType, data: audioBase64 } },
             ],
