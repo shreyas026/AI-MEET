@@ -1,1 +1,12 @@
-project_id = "xxwumkfanxicfqzsyyhd"
+project_id = "ygczwvgobhgfpcuyxmng"
+
+[auth]
+site_url = "https://ai-meet-one.vercel.app"
+additional_redirect_urls = [
+  "https://ai-meet-one.vercel.app",
+  "https://ai-meet-one.vercel.app/auth",
+  "https://ai-meet-*.vercel.app",
+  "https://ai-meet-*.vercel.app/auth",
+  "http://localhost:5173",
+  "http://localhost:5173/auth",
+]

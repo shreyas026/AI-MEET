@@ -21,6 +21,12 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+function getAuthRedirectUrl(path = "") {
+  const configuredUrl = import.meta.env.VITE_APP_URL?.replace(/\/$/, "");
+  const origin = configuredUrl || window.location.origin;
+  return `${origin}${path}`;
+}
+
 function AuthPage() {
   const { mode: initialMode } = Route.useSearch();
   const [mode, setMode] = useState<"signin" | "signup">(initialMode ?? "signin");
@@ -54,7 +60,7 @@ function AuthPage() {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: getAuthRedirectUrl("/auth"),
             data: { full_name: name || email.split("@")[0] },
           },
         });
@@ -86,7 +92,7 @@ function AuthPage() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth`,
+          redirectTo: getAuthRedirectUrl("/auth"),
         },
       });
       if (error) throw error;
