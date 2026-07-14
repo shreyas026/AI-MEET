@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Mic, StopCircle, Upload, Sparkles } from "lucide-react";
+import { Mic, MonitorUp, StopCircle, Upload, Sparkles } from "lucide-react";
 import { createMeeting, setMeetingAudio } from "@/lib/meetings.functions";
 import { listProjects } from "@/lib/projects.functions";
 import { transcribeMeeting, analyzeMeeting } from "@/lib/ai.functions";
@@ -75,6 +75,9 @@ function getMediaContentType(blob: Blob, extension: string): string {
 
 function getSupportedRecordingOptions(): MediaRecorderOptions | undefined {
   const supportedType = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm",
     "audio/webm;codecs=opus",
     "audio/webm",
     "audio/mp4",
@@ -84,11 +87,17 @@ function getSupportedRecordingOptions(): MediaRecorderOptions | undefined {
   return supportedType ? { mimeType: supportedType } : undefined;
 }
 
+type MeetingSourceMode = "upload" | "mic" | "tab";
+
+type DisplayMediaDevices = MediaDevices & {
+  getDisplayMedia?: (constraints?: DisplayMediaStreamOptions) => Promise<MediaStream>;
+};
+
 function NewMeeting() {
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] = useState<string>("none");
-  const [mode, setMode] = useState<"upload" | "record">("upload");
+  const [mode, setMode] = useState<MeetingSourceMode>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recording, setRecording] = useState(false);
@@ -119,15 +128,49 @@ function NewMeeting() {
     };
   }, []);
 
-  async function startRecording() {
+  function resetRecordingState() {
+    setRecordedBlob(null);
+    setElapsed(0);
+  }
+
+  function finalizeRecording(blob: Blob) {
+    if (blob.size === 0) {
+      setRecordedBlob(null);
+      toast.error("Recording was empty. Please try again.");
+      return;
+    }
+
+    setRecordedBlob(blob);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+  }
+
+  async function startRecording(source: Exclude<MeetingSourceMode, "upload">) {
     try {
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
         toast.error("Recording is not supported in this browser");
         return;
       }
 
-      setRecordedBlob(null);
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      resetRecordingState();
+      const stream =
+        source === "tab"
+          ? await (navigator.mediaDevices as DisplayMediaDevices).getDisplayMedia?.({
+              video: true,
+              audio: true,
+            })
+          : await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      if (!stream) {
+        toast.error("Screen recording is not supported in this browser");
+        return;
+      }
+
+      if (source === "tab" && stream.getAudioTracks().length === 0) {
+        stream.getTracks().forEach((track) => track.stop());
+        toast.error("No tab audio was shared. Select a browser tab and enable tab audio.");
+        return;
+      }
+
       streamRef.current = stream;
       const recordingOptions = getSupportedRecordingOptions();
       const mr = new MediaRecorder(stream, recordingOptions);
@@ -137,26 +180,28 @@ function NewMeeting() {
       };
       mr.onstop = () => {
         const blob = new Blob(chunksRef.current, {
-          type: mr.mimeType || recordingOptions?.mimeType || "audio/webm",
+          type:
+            mr.mimeType ||
+            recordingOptions?.mimeType ||
+            (source === "tab" ? "video/webm" : "audio/webm"),
         });
-        if (blob.size === 0) {
-          setRecordedBlob(null);
-          toast.error("Recording was empty. Please try again.");
-          return;
-        }
-        setRecordedBlob(blob);
-        streamRef.current?.getTracks().forEach((t) => t.stop());
+        finalizeRecording(blob);
       };
       mr.onerror = () => {
         toast.error("Recording failed. Please check microphone permission and try again.");
       };
+      stream.getTracks().forEach((track) => {
+        track.onended = () => {
+          if (recorderRef.current?.state === "recording") stopRecording();
+        };
+      });
       mr.start(1000);
       recorderRef.current = mr;
       setRecording(true);
       setElapsed(0);
       timerRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
     } catch (err) {
-      toast.error("Microphone access denied");
+      toast.error(source === "tab" ? "Meeting tab sharing was cancelled" : "Microphone access denied");
     }
   }
 
@@ -172,7 +217,7 @@ function NewMeeting() {
   async function submit() {
     if (!title.trim()) return toast.error("Please give the meeting a title");
     if (recording) return toast.error("Please stop the recording before transcribing");
-    const audioBlob = mode === "record" ? recordedBlob : file;
+    const audioBlob = mode === "upload" ? file : recordedBlob;
     if (!audioBlob) return toast.error("Please attach audio or video to transcribe");
 
     setBusy(true);
@@ -206,15 +251,27 @@ function NewMeeting() {
         data: {
           id: meeting.id,
           audio_path: path,
-          duration_seconds: mode === "record" ? elapsed : null,
+          duration_seconds: mode === "upload" ? null : elapsed,
         },
       });
 
       setStep("Transcribing…");
-      await transcribeFn({ data: { meetingId: meeting.id } });
+      try {
+        await transcribeFn({ data: { meetingId: meeting.id } });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Transcription failed");
+        navigate({ to: "/meetings/$meetingId", params: { meetingId: meeting.id } });
+        return;
+      }
 
       setStep("Extracting action items, decisions, risks…");
-      await analyzeFn({ data: { meetingId: meeting.id } });
+      try {
+        await analyzeFn({ data: { meetingId: meeting.id } });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Analysis failed");
+        navigate({ to: "/meetings/$meetingId", params: { meetingId: meeting.id } });
+        return;
+      }
 
       toast.success("Meeting analyzed!");
       navigate({ to: "/meetings/$meetingId", params: { meetingId: meeting.id } });
@@ -269,12 +326,15 @@ function NewMeeting() {
             <div>
               <Label>Meeting source</Label>
               <Tabs value={mode} onValueChange={(v) => setMode(v as any)}>
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="upload" disabled={busy}>
                     <Upload className="mr-2 h-4 w-4" /> Upload
                   </TabsTrigger>
-                  <TabsTrigger value="record" disabled={busy}>
-                    <Mic className="mr-2 h-4 w-4" /> Record
+                  <TabsTrigger value="mic" disabled={busy}>
+                    <Mic className="mr-2 h-4 w-4" /> Mic
+                  </TabsTrigger>
+                  <TabsTrigger value="tab" disabled={busy}>
+                    <MonitorUp className="mr-2 h-4 w-4" /> Tab
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="upload" className="mt-4">
@@ -297,14 +357,14 @@ function NewMeeting() {
                     )}
                   </div>
                 </TabsContent>
-                <TabsContent value="record" className="mt-4">
+                <TabsContent value="mic" className="mt-4">
                   <div className="rounded-lg border border-border bg-secondary/40 p-8 text-center">
                     <div className="font-display text-4xl font-semibold tabular-nums">
                       {fmt(elapsed)}
                     </div>
                     <div className="mt-6 flex justify-center gap-3">
                       {!recording ? (
-                        <Button onClick={startRecording} disabled={busy || !!recordedBlob}>
+                        <Button onClick={() => startRecording("mic")} disabled={busy || !!recordedBlob}>
                           <Mic className="mr-2 h-4 w-4" /> Start recording
                         </Button>
                       ) : (
@@ -316,8 +376,7 @@ function NewMeeting() {
                         <Button
                           variant="outline"
                           onClick={() => {
-                            setRecordedBlob(null);
-                            setElapsed(0);
+                            resetRecordingState();
                           }}
                           disabled={busy}
                         >
@@ -334,6 +393,44 @@ function NewMeeting() {
                     {recordedBlob && !recording && (
                       <p className="mt-4 text-xs text-emerald-700">
                         Recording captured ({(recordedBlob.size / 1024 / 1024).toFixed(1)} MB)
+                      </p>
+                    )}
+                  </div>
+                </TabsContent>
+                <TabsContent value="tab" className="mt-4">
+                  <div className="rounded-lg border border-border bg-secondary/40 p-8 text-center">
+                    <MonitorUp className="mx-auto h-8 w-8 text-muted-foreground" />
+                    <div className="mt-4 font-display text-4xl font-semibold tabular-nums">
+                      {fmt(elapsed)}
+                    </div>
+                    <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
+                      Select your meeting browser tab and enable tab audio when Chrome asks what to share.
+                    </p>
+                    <div className="mt-6 flex justify-center gap-3">
+                      {!recording ? (
+                        <Button onClick={() => startRecording("tab")} disabled={busy || !!recordedBlob}>
+                          <MonitorUp className="mr-2 h-4 w-4" /> Record meeting tab
+                        </Button>
+                      ) : (
+                        <Button onClick={stopRecording} variant="destructive">
+                          <StopCircle className="mr-2 h-4 w-4" /> Stop
+                        </Button>
+                      )}
+                      {recordedBlob && !recording && (
+                        <Button variant="outline" onClick={resetRecordingState} disabled={busy}>
+                          Re-record
+                        </Button>
+                      )}
+                    </div>
+                    {recording && (
+                      <p className="mt-4 flex items-center justify-center gap-2 text-xs text-destructive">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-destructive" />
+                        Recording meeting tab
+                      </p>
+                    )}
+                    {recordedBlob && !recording && (
+                      <p className="mt-4 text-xs text-emerald-700">
+                        Tab recording captured ({(recordedBlob.size / 1024 / 1024).toFixed(1)} MB)
                       </p>
                     )}
                   </div>

@@ -28,8 +28,15 @@ async function readAiError(response: Response): Promise<string> {
   if (!body) return `${response.status} ${response.statusText}`.trim();
   try {
     const parsed = JSON.parse(body) as { error?: { message?: string } };
-    return parsed.error?.message || body;
+    const message = parsed.error?.message || body;
+    if (response.status === 429 || /quota|rate limit/i.test(message)) {
+      return "Gemini quota is exhausted for now. Please wait for the quota reset or use a billing-enabled Gemini API key.";
+    }
+    return message;
   } catch {
+    if (response.status === 429 || /quota|rate limit/i.test(body)) {
+      return "Gemini quota is exhausted for now. Please wait for the quota reset or use a billing-enabled Gemini API key.";
+    }
     return body;
   }
 }
