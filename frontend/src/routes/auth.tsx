@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Workflow } from "lucide-react";
+import { AnimatedBackground } from "@/components/animated-background";
 import { toast } from "sonner";
 
 const searchSchema = z.object({ mode: z.enum(["signin", "signup"]).optional() });
@@ -108,7 +109,8 @@ function AuthPage() {
   }
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
+    <div className="relative grid min-h-screen lg:grid-cols-2">
+      <AnimatedBackground />
       <div className="flex flex-col justify-between bg-secondary/60 p-10">
         <Link to="/" className="flex items-center gap-2 font-display text-lg font-semibold">
           <span className="grid h-8 w-8 place-items-center rounded-md bg-primary text-primary-foreground">

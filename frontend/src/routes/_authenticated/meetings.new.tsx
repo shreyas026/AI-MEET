@@ -16,10 +16,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Mic, MonitorUp, StopCircle, Upload, Sparkles } from "lucide-react";
+import { Mic, MonitorUp, StopCircle, Upload, Sparkles, Radio } from "lucide-react";
 import { createMeeting, setMeetingAudio } from "@/lib/meetings.functions";
 import { listProjects } from "@/lib/projects.functions";
 import { transcribeMeeting, analyzeMeeting } from "@/lib/ai.functions";
+import { saveLiveTranscript } from "@/lib/transcripts.functions";
+import { LiveTranscriptRecorder } from "@/components/live-transcription";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/meetings/new")({
@@ -87,7 +89,7 @@ function getSupportedRecordingOptions(): MediaRecorderOptions | undefined {
   return supportedType ? { mimeType: supportedType } : undefined;
 }
 
-type MeetingSourceMode = "upload" | "mic" | "tab";
+type MeetingSourceMode = "upload" | "mic" | "tab" | "live";
 
 type DisplayMediaDevices = MediaDevices & {
   getDisplayMedia?: (constraints?: DisplayMediaStreamOptions) => Promise<MediaStream>;
@@ -100,6 +102,12 @@ function NewMeeting() {
   const [mode, setMode] = useState<MeetingSourceMode>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [liveResult, setLiveResult] = useState<{
+    transcript: string;
+    segments: any[];
+    blob: Blob;
+    duration_seconds: number;
+  } | null>(null);
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -115,6 +123,7 @@ function NewMeeting() {
   const setAudioFn = useServerFn(setMeetingAudio);
   const transcribeFn = useServerFn(transcribeMeeting);
   const analyzeFn = useServerFn(analyzeMeeting);
+  const saveLiveFn = useServerFn(saveLiveTranscript);
 
   const { data: projects } = useQuery({
     queryKey: ["projects"],
@@ -201,7 +210,9 @@ function NewMeeting() {
       setElapsed(0);
       timerRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
     } catch (err) {
-      toast.error(source === "tab" ? "Meeting tab sharing was cancelled" : "Microphone access denied");
+      toast.error(
+        source === "tab" ? "Meeting tab sharing was cancelled" : "Microphone access denied",
+      );
     }
   }
 
@@ -217,8 +228,13 @@ function NewMeeting() {
   async function submit() {
     if (!title.trim()) return toast.error("Please give the meeting a title");
     if (recording) return toast.error("Please stop the recording before transcribing");
-    const audioBlob = mode === "upload" ? file : recordedBlob;
-    if (!audioBlob) return toast.error("Please attach audio or video to transcribe");
+
+    const isLive = mode === "live";
+    const audioBlob = isLive ? (liveResult?.blob ?? null) : mode === "upload" ? file : recordedBlob;
+    if (!audioBlob) {
+      if (isLive) return toast.error("Finish the live session (Stop & save) before analyzing");
+      return toast.error("Please attach audio or video to transcribe");
+    }
 
     setBusy(true);
     try {
@@ -251,17 +267,33 @@ function NewMeeting() {
         data: {
           id: meeting.id,
           audio_path: path,
-          duration_seconds: mode === "upload" ? null : elapsed,
+          duration_seconds: isLive
+            ? (liveResult?.duration_seconds ?? elapsed)
+            : mode === "upload"
+              ? null
+              : elapsed,
         },
       });
 
-      setStep("Transcribing…");
-      try {
-        await transcribeFn({ data: { meetingId: meeting.id } });
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Transcription failed");
-        navigate({ to: "/meetings/$meetingId", params: { meetingId: meeting.id } });
-        return;
+      if (isLive && liveResult) {
+        setStep("Saving live transcript…");
+        await saveLiveFn({
+          data: {
+            meetingId: meeting.id,
+            transcript: liveResult.transcript,
+            segments: liveResult.segments,
+            duration_seconds: liveResult.duration_seconds,
+          },
+        });
+      } else {
+        setStep("Transcribing…");
+        try {
+          await transcribeFn({ data: { meetingId: meeting.id } });
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Transcription failed");
+          navigate({ to: "/meetings/$meetingId", params: { meetingId: meeting.id } });
+          return;
+        }
       }
 
       setStep("Extracting action items, decisions, risks…");
@@ -326,7 +358,7 @@ function NewMeeting() {
             <div>
               <Label>Meeting source</Label>
               <Tabs value={mode} onValueChange={(v) => setMode(v as any)}>
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="upload" disabled={busy}>
                     <Upload className="mr-2 h-4 w-4" /> Upload
                   </TabsTrigger>
@@ -335,6 +367,9 @@ function NewMeeting() {
                   </TabsTrigger>
                   <TabsTrigger value="tab" disabled={busy}>
                     <MonitorUp className="mr-2 h-4 w-4" /> Tab
+                  </TabsTrigger>
+                  <TabsTrigger value="live" disabled={busy}>
+                    <Radio className="mr-2 h-4 w-4" /> Live
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="upload" className="mt-4">
@@ -364,7 +399,10 @@ function NewMeeting() {
                     </div>
                     <div className="mt-6 flex justify-center gap-3">
                       {!recording ? (
-                        <Button onClick={() => startRecording("mic")} disabled={busy || !!recordedBlob}>
+                        <Button
+                          onClick={() => startRecording("mic")}
+                          disabled={busy || !!recordedBlob}
+                        >
                           <Mic className="mr-2 h-4 w-4" /> Start recording
                         </Button>
                       ) : (
@@ -404,11 +442,15 @@ function NewMeeting() {
                       {fmt(elapsed)}
                     </div>
                     <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
-                      Select your meeting browser tab and enable tab audio when Chrome asks what to share.
+                      Select your meeting browser tab and enable tab audio when Chrome asks what to
+                      share.
                     </p>
                     <div className="mt-6 flex justify-center gap-3">
                       {!recording ? (
-                        <Button onClick={() => startRecording("tab")} disabled={busy || !!recordedBlob}>
+                        <Button
+                          onClick={() => startRecording("tab")}
+                          disabled={busy || !!recordedBlob}
+                        >
                           <MonitorUp className="mr-2 h-4 w-4" /> Record meeting tab
                         </Button>
                       ) : (
@@ -431,6 +473,28 @@ function NewMeeting() {
                     {recordedBlob && !recording && (
                       <p className="mt-4 text-xs text-emerald-700">
                         Tab recording captured ({(recordedBlob.size / 1024 / 1024).toFixed(1)} MB)
+                      </p>
+                    )}
+                  </div>
+                </TabsContent>
+                <TabsContent value="live" className="mt-4">
+                  <div className="rounded-lg border border-border bg-secondary/40 p-4">
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      Watch the transcript appear in real time as the meeting happens — live
+                      captions powered by Gemini. Stop to save, then analyze automatically.
+                    </p>
+                    <LiveTranscriptRecorder
+                      disabled={busy}
+                      onFinished={(data) => {
+                        setLiveResult(data);
+                        toast.success(
+                          `Captured ${Math.max(1, Math.round(data.duration_seconds / 60))} min of live audio`,
+                        );
+                      }}
+                    />
+                    {liveResult && (
+                      <p className="mt-3 text-xs text-emerald-700">
+                        Live session captured — ready to analyze.
                       </p>
                     )}
                   </div>

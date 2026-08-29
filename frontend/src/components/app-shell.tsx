@@ -10,10 +10,13 @@ import {
   Folders,
   Settings,
   Workflow,
+  Search,
   LogOut,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AnimatedBackground } from "@/components/animated-background";
 import type { ReactNode } from "react";
 
 const nav = [
@@ -22,6 +25,7 @@ const nav = [
   { to: "/tasks", label: "Tasks", icon: ListChecks },
   { to: "/decisions", label: "Decisions", icon: MessageSquareText },
   { to: "/risks", label: "Risks", icon: ShieldAlert },
+  { to: "/search", label: "Search", icon: Search },
   { to: "/projects", label: "Projects", icon: Folders },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
@@ -54,7 +58,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     .join("");
 
   return (
-    <div className="grid min-h-screen bg-background lg:grid-cols-[240px_1fr]">
+    <div className="relative grid min-h-screen bg-background lg:grid-cols-[240px_1fr]">
+      <AnimatedBackground />
       <aside className="hidden border-r border-border bg-sidebar lg:flex lg:flex-col">
         <div className="flex h-16 items-center gap-2 border-b border-border px-5">
           <span className="grid h-8 w-8 place-items-center rounded-md bg-primary text-primary-foreground">

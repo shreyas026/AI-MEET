@@ -5,7 +5,7 @@ import { listMeetings } from "@/lib/meetings.functions";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Mic } from "lucide-react";
+import { Plus, Mic, Bot } from "lucide-react";
 import { StatusPill } from "@/components/status-pill";
 import { formatDistanceToNow } from "date-fns";
 
@@ -31,11 +31,18 @@ function MeetingsList() {
         title="Meetings"
         description="Every recorded meeting and its extracted work"
         actions={
-          <Button asChild>
-            <Link to="/meetings/new">
-              <Plus className="mr-1 h-4 w-4" /> New meeting
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link to="/meetings/live">
+                <Bot className="mr-1 h-4 w-4" /> AI live meeting
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/meetings/new">
+                <Plus className="mr-1 h-4 w-4" /> New meeting
+              </Link>
+            </Button>
+          </div>
         }
       />
       <PageBody>

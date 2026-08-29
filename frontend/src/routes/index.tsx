@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { AnimatedBackground } from "@/components/animated-background";
 import {
   Mic,
   ListChecks,
@@ -8,6 +9,9 @@ import {
   Search,
   Workflow,
   ArrowRight,
+  Bot,
+  Mail,
+  Radio,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -16,7 +20,8 @@ export const Route = createFileRoute("/")({
 
 function Landing() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="relative min-h-screen bg-background text-foreground">
+      <AnimatedBackground variant="dense" />
       {/* Nav */}
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
@@ -54,16 +59,16 @@ function Landing() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground">
               <Sparkles className="h-3.5 w-3.5 text-primary" />
-              AI meeting intelligence for execution teams
+              Your AI joins the meeting — takes notes, so you don't
             </div>
             <h1 className="mt-6 font-display text-5xl font-semibold leading-[1.05] tracking-tight md:text-6xl">
-              Every meeting, <br />
-              turned into work that ships.
+              The meeting runs, <br />
+              the AI takes the notes.
             </h1>
             <p className="mt-6 max-w-xl text-lg text-muted-foreground">
-              AI Meeting Operator records the conversation, understands the context, and pulls out
-              action items, decisions, and risks — with owners, deadlines, and priorities —
-              the moment the meeting ends.
+              Invite the AI assistant to your live call. It listens in real time, turns the
+              conversation into timestamped notes, and emails the complete summary — action items,
+              decisions, and risks — the moment the meeting ends.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button asChild size="lg">
@@ -163,6 +168,21 @@ function Landing() {
             title="Kanban that stays in sync"
             body="Extracted tasks land on a workspace board. Reassign, comment, and update status — no double entry."
           />
+          <Feature
+            icon={<Bot className="h-5 w-5" />}
+            title="AI joins your live call"
+            body="Start a live room and the assistant joins as a participant — it transcribes in real time and can answer questions mid-meeting."
+          />
+          <Feature
+            icon={<Mail className="h-5 w-5" />}
+            title="Full notes by email"
+            body="When the meeting ends, the complete summary, action items, decisions, and risks are emailed straight to your inbox."
+          />
+          <Feature
+            icon={<Radio className="h-5 w-5" />}
+            title="Timestamped transcript"
+            body="Speaker-labeled, click-to-seek transcript — jump back to the exact moment anything was said."
+          />
         </div>
       </section>
 
@@ -177,10 +197,10 @@ function Landing() {
           </div>
           <ol className="mt-12 grid gap-4 md:grid-cols-4">
             {[
-              { n: "01", t: "Capture", b: "Record live or upload the meeting audio." },
-              { n: "02", t: "Transcribe", b: "Streaming speech-to-text builds the transcript in real time." },
-              { n: "03", t: "Extract", b: "GPT-class AI produces action items, decisions, risks, and a summary." },
-              { n: "04", t: "Execute", b: "Tasks appear on the kanban. Decisions become searchable memory." },
+              { n: "01", t: "Invite the AI", b: "Start a live room — the AI assistant joins your call as a participant." },
+              { n: "02", t: "Transcribe live", b: "Streaming speech-to-text builds a timestamped transcript in real time." },
+              { n: "03", t: "Extract", b: "Gemini produces action items, decisions, risks, and a summary." },
+              { n: "04", t: "Receive by email", b: "The complete meeting notes land in your inbox the moment it ends." },
             ].map((s) => (
               <li key={s.n} className="rounded-xl border border-border bg-card p-6">
                 <div className="font-display text-sm text-primary">{s.n}</div>

@@ -34,15 +34,16 @@ export const getMeeting = createServerFn({ method: "GET" })
       .single();
     if (error) throw new Error(error.message);
 
-    const [transcriptRes, actionItemsRes, decisionsRes, risksRes] = await Promise.all([
+    const [transcriptRes, actionItemsRes, decisionsRes, risksRes, segmentsRes] = await Promise.all([
       supabase.from("transcripts").select("content").eq("meeting_id", data.id).maybeSingle(),
-      supabase
-        .from("action_items")
-        .select("*")
-        .eq("meeting_id", data.id)
-        .order("created_at"),
+      supabase.from("action_items").select("*").eq("meeting_id", data.id).order("created_at"),
       supabase.from("decisions").select("*").eq("meeting_id", data.id).order("created_at"),
       supabase.from("risks").select("*").eq("meeting_id", data.id).order("severity"),
+      supabase
+        .from("transcript_segments")
+        .select("*")
+        .eq("meeting_id", data.id)
+        .order("seq", { ascending: true }),
     ]);
 
     let audioUrl: string | null = null;
@@ -59,6 +60,7 @@ export const getMeeting = createServerFn({ method: "GET" })
       actionItems: actionItemsRes.data ?? [],
       decisions: decisionsRes.data ?? [],
       risks: risksRes.data ?? [],
+      segments: segmentsRes.data ?? [],
       audioUrl,
     };
   });

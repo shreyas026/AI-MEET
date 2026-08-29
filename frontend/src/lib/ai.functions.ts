@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { embedTexts, generateJsonCompletion, transcribeAudioBlob } from "@/lib/gemini.server";
 import { getOrCreateWorkspace } from "@/lib/workspace.functions";
+import { rebuildChunks } from "@/lib/transcript-chunks.server";
 
 // ============ Transcription ============
 
@@ -54,6 +55,9 @@ export const transcribeMeeting = createServerFn({ method: "POST" })
         { meeting_id: meeting.id, workspace_id: meeting.workspace_id, content: transcript },
         { onConflict: "meeting_id" },
       );
+
+    // Index transcript chunks for semantic "ask about this meeting" retrieval
+    await rebuildChunks(supabase, meeting.id, meeting.workspace_id, transcript).catch(() => {});
 
     return { transcript, meetingId: meeting.id };
   });
@@ -214,7 +218,7 @@ Return ONLY a JSON object with this exact shape (no prose):
           description: a.description,
           assignee_name: a.assignee_name,
           assignee_id: a.assignee_name
-            ? memberByName.get(a.assignee_name.toLowerCase()) ?? null
+            ? (memberByName.get(a.assignee_name.toLowerCase()) ?? null)
             : null,
           due_date: a.due_date,
           priority: a.priority,
@@ -284,9 +288,7 @@ Return ONLY a JSON object with this exact shape (no prose):
 
 export const searchDecisions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: unknown) =>
-    z.object({ query: z.string().min(1).max(500) }).parse(d),
-  )
+  .validator((d: unknown) => z.object({ query: z.string().min(1).max(500) }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 

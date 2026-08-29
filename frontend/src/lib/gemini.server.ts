@@ -5,6 +5,7 @@ type GeminiConfig = {
   transcriptionModel: string;
   embeddingModel: string;
   embeddingDimensions: number;
+  liveModel: string;
 };
 
 function getGeminiConfig(): GeminiConfig {
@@ -15,12 +16,67 @@ function getGeminiConfig(): GeminiConfig {
     apiKey,
     baseUrl:
       process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com/v1beta",
-    chatModel: process.env.GEMINI_CHAT_MODEL?.trim() || "gemini-3.5-flash",
-    transcriptionModel:
-      process.env.GEMINI_TRANSCRIBE_MODEL?.trim() || "gemini-3.5-flash",
+    chatModel: process.env.GEMINI_CHAT_MODEL?.trim() || "gemini-2.5-flash",
+    transcriptionModel: process.env.GEMINI_TRANSCRIBE_MODEL?.trim() || "gemini-2.5-flash",
     embeddingModel: process.env.GEMINI_EMBEDDING_MODEL?.trim() || "gemini-embedding-001",
     embeddingDimensions: Number(process.env.GEMINI_EMBEDDING_DIMENSIONS?.trim() || 1536),
+    liveModel: process.env.GEMINI_LIVE_MODEL?.trim() || "gemini-2.5-flash",
   };
+}
+
+// Raw-text chat completion (for "Ask about this meeting" and general Q&A)
+export async function generateTextCompletion(prompt: string): Promise<string> {
+  const { apiKey, baseUrl, chatModel } = getGeminiConfig();
+  const response = await fetch(apiUrl(baseUrl, `/models/${chatModel}:generateContent`, apiKey), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: 1200 },
+    }),
+  });
+  if (!response.ok) throw new Error(`AI completion failed: ${await readAiError(response)}`);
+  return extractGeminiText(await response.json());
+}
+
+// Create an ephemeral token so the browser can connect to the Gemini Live API
+// (WebSocket) without exposing the API key. The token is single-use and
+// short-lived. The browser connects directly to the API afterwards.
+export async function createLiveAuthToken(): Promise<{ token: string; expireTime: string }> {
+  const { apiKey } = getGeminiConfig();
+  const now = Date.now();
+  const resp = await fetch("https://generativelanguage.googleapis.com/v1beta/auth_tokens", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    },
+    body: JSON.stringify({
+      uses: 1,
+      expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
+      newSessionExpireTime: new Date(now + 10 * 60 * 1000).toISOString(),
+    }),
+  });
+  if (!resp.ok) throw new Error(`Live token failed: ${await readAiError(resp)}`);
+  const data = (await resp.json()) as {
+    authToken?: { name?: string; expireTime?: string } | string;
+    name?: string;
+    expireTime?: string;
+  };
+  const token =
+    (typeof data.authToken === "string" ? data.authToken : data.authToken?.name) || data.name;
+  if (!token) throw new Error("No token returned from Gemini provisioning API");
+  return {
+    token,
+    expireTime:
+      (typeof data.authToken === "object" ? data.authToken?.expireTime : undefined) ||
+      data.expireTime ||
+      "",
+  };
+}
+
+export function getLiveModel(): string {
+  return getGeminiConfig().liveModel;
 }
 
 async function readAiError(response: Response): Promise<string> {
@@ -106,8 +162,7 @@ export async function transcribeAudioBlob(audio: Blob, filename: string): Promis
           {
             parts: [
               {
-                text:
-                  "Transcribe the spoken meeting content in this media accurately. Return only the transcript text, with no markdown or summary.",
+                text: "Transcribe the spoken meeting content in this media accurately. Return only the transcript text, with no markdown or summary.",
               },
               { inlineData: { mimeType, data: audioBase64 } },
             ],
@@ -165,17 +220,20 @@ export async function embedTexts(input: string | string[]): Promise<number[][]> 
 
   return Promise.all(
     inputs.map(async (text) => {
-      const response = await fetch(apiUrl(baseUrl, `/models/${embeddingModel}:embedContent`, apiKey), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content: { parts: [{ text }] },
-          embedContentConfig: {
-            outputDimensionality: embeddingDimensions,
-            taskType: "SEMANTIC_SIMILARITY",
-          },
-        }),
-      });
+      const response = await fetch(
+        apiUrl(baseUrl, `/models/${embeddingModel}:embedContent`, apiKey),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: { parts: [{ text }] },
+            embedContentConfig: {
+              outputDimensionality: embeddingDimensions,
+              taskType: "SEMANTIC_SIMILARITY",
+            },
+          }),
+        },
+      );
 
       if (!response.ok) {
         throw new Error(`Embedding failed: ${await readAiError(response)}`);

@@ -14,12 +14,14 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSearchRouteImport } from './routes/_authenticated/search'
 import { Route as AuthenticatedRisksRouteImport } from './routes/_authenticated/risks'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
 import { Route as AuthenticatedDecisionsRouteImport } from './routes/_authenticated/decisions'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedMeetingsNewRouteImport } from './routes/_authenticated/meetings.new'
+import { Route as AuthenticatedMeetingsLiveRouteImport } from './routes/_authenticated/meetings.live'
 import { Route as AuthenticatedMeetingsMeetingIdRouteImport } from './routes/_authenticated/meetings.$meetingId'
 
 const AuthRoute = AuthRouteImport.update({
@@ -44,6 +46,11 @@ const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSearchRoute = AuthenticatedSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedRisksRoute = AuthenticatedRisksRouteImport.update({
@@ -77,6 +84,12 @@ const AuthenticatedMeetingsNewRoute =
     path: '/new',
     getParentRoute: () => AuthenticatedMeetingsRoute,
   } as any)
+const AuthenticatedMeetingsLiveRoute =
+  AuthenticatedMeetingsLiveRouteImport.update({
+    id: '/live',
+    path: '/live',
+    getParentRoute: () => AuthenticatedMeetingsRoute,
+  } as any)
 const AuthenticatedMeetingsMeetingIdRoute =
   AuthenticatedMeetingsMeetingIdRouteImport.update({
     id: '/$meetingId',
@@ -92,9 +105,11 @@ export interface FileRoutesByFullPath {
   '/meetings': typeof AuthenticatedMeetingsRouteWithChildren
   '/projects': typeof AuthenticatedProjectsRoute
   '/risks': typeof AuthenticatedRisksRoute
+  '/search': typeof AuthenticatedSearchRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/meetings/$meetingId': typeof AuthenticatedMeetingsMeetingIdRoute
+  '/meetings/live': typeof AuthenticatedMeetingsLiveRoute
   '/meetings/new': typeof AuthenticatedMeetingsNewRoute
 }
 export interface FileRoutesByTo {
@@ -105,9 +120,11 @@ export interface FileRoutesByTo {
   '/meetings': typeof AuthenticatedMeetingsRouteWithChildren
   '/projects': typeof AuthenticatedProjectsRoute
   '/risks': typeof AuthenticatedRisksRoute
+  '/search': typeof AuthenticatedSearchRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/meetings/$meetingId': typeof AuthenticatedMeetingsMeetingIdRoute
+  '/meetings/live': typeof AuthenticatedMeetingsLiveRoute
   '/meetings/new': typeof AuthenticatedMeetingsNewRoute
 }
 export interface FileRoutesById {
@@ -120,9 +137,11 @@ export interface FileRoutesById {
   '/_authenticated/meetings': typeof AuthenticatedMeetingsRouteWithChildren
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/risks': typeof AuthenticatedRisksRoute
+  '/_authenticated/search': typeof AuthenticatedSearchRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
   '/_authenticated/meetings/$meetingId': typeof AuthenticatedMeetingsMeetingIdRoute
+  '/_authenticated/meetings/live': typeof AuthenticatedMeetingsLiveRoute
   '/_authenticated/meetings/new': typeof AuthenticatedMeetingsNewRoute
 }
 export interface FileRouteTypes {
@@ -135,9 +154,11 @@ export interface FileRouteTypes {
     | '/meetings'
     | '/projects'
     | '/risks'
+    | '/search'
     | '/settings'
     | '/tasks'
     | '/meetings/$meetingId'
+    | '/meetings/live'
     | '/meetings/new'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -148,9 +169,11 @@ export interface FileRouteTypes {
     | '/meetings'
     | '/projects'
     | '/risks'
+    | '/search'
     | '/settings'
     | '/tasks'
     | '/meetings/$meetingId'
+    | '/meetings/live'
     | '/meetings/new'
   id:
     | '__root__'
@@ -162,9 +185,11 @@ export interface FileRouteTypes {
     | '/_authenticated/meetings'
     | '/_authenticated/projects'
     | '/_authenticated/risks'
+    | '/_authenticated/search'
     | '/_authenticated/settings'
     | '/_authenticated/tasks'
     | '/_authenticated/meetings/$meetingId'
+    | '/_authenticated/meetings/live'
     | '/_authenticated/meetings/new'
   fileRoutesById: FileRoutesById
 }
@@ -211,6 +236,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/search': {
+      id: '/_authenticated/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof AuthenticatedSearchRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/risks': {
       id: '/_authenticated/risks'
       path: '/risks'
@@ -253,6 +285,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMeetingsNewRouteImport
       parentRoute: typeof AuthenticatedMeetingsRoute
     }
+    '/_authenticated/meetings/live': {
+      id: '/_authenticated/meetings/live'
+      path: '/live'
+      fullPath: '/meetings/live'
+      preLoaderRoute: typeof AuthenticatedMeetingsLiveRouteImport
+      parentRoute: typeof AuthenticatedMeetingsRoute
+    }
     '/_authenticated/meetings/$meetingId': {
       id: '/_authenticated/meetings/$meetingId'
       path: '/$meetingId'
@@ -265,11 +304,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedMeetingsRouteChildren {
   AuthenticatedMeetingsMeetingIdRoute: typeof AuthenticatedMeetingsMeetingIdRoute
+  AuthenticatedMeetingsLiveRoute: typeof AuthenticatedMeetingsLiveRoute
   AuthenticatedMeetingsNewRoute: typeof AuthenticatedMeetingsNewRoute
 }
 
 const AuthenticatedMeetingsRouteChildren: AuthenticatedMeetingsRouteChildren = {
   AuthenticatedMeetingsMeetingIdRoute: AuthenticatedMeetingsMeetingIdRoute,
+  AuthenticatedMeetingsLiveRoute: AuthenticatedMeetingsLiveRoute,
   AuthenticatedMeetingsNewRoute: AuthenticatedMeetingsNewRoute,
 }
 
@@ -284,6 +325,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMeetingsRoute: typeof AuthenticatedMeetingsRouteWithChildren
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedRisksRoute: typeof AuthenticatedRisksRoute
+  AuthenticatedSearchRoute: typeof AuthenticatedSearchRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
 }
@@ -294,6 +336,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMeetingsRoute: AuthenticatedMeetingsRouteWithChildren,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedRisksRoute: AuthenticatedRisksRoute,
+  AuthenticatedSearchRoute: AuthenticatedSearchRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
 }

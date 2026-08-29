@@ -7,7 +7,7 @@ import { PageBody, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
-import { Calendar, ListChecks, AlertTriangle, TrendingUp, Plus, Mic } from "lucide-react";
+import { Calendar, ListChecks, AlertTriangle, TrendingUp, Plus, Mic, Bot } from "lucide-react";
 import { StatusPill } from "@/components/status-pill";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -29,11 +29,18 @@ function Dashboard() {
         title="Dashboard"
         description="Your workspace at a glance"
         actions={
-          <Button asChild>
-            <Link to="/meetings/new">
-              <Plus className="mr-1 h-4 w-4" /> New meeting
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link to="/meetings/live">
+                <Bot className="mr-1 h-4 w-4" /> AI live meeting
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/meetings/new">
+                <Plus className="mr-1 h-4 w-4" /> New meeting
+              </Link>
+            </Button>
+          </div>
         }
       />
       <PageBody>
