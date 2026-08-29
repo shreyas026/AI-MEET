@@ -16,11 +16,11 @@ function getGeminiConfig(): GeminiConfig {
     apiKey,
     baseUrl:
       process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com/v1beta",
-    chatModel: process.env.GEMINI_CHAT_MODEL?.trim() || "gemini-2.5-flash",
-    transcriptionModel: process.env.GEMINI_TRANSCRIBE_MODEL?.trim() || "gemini-2.5-flash",
+    chatModel: process.env.GEMINI_CHAT_MODEL?.trim() || "gemini-3.6-flash",
+    transcriptionModel: process.env.GEMINI_TRANSCRIBE_MODEL?.trim() || "gemini-3.6-flash",
     embeddingModel: process.env.GEMINI_EMBEDDING_MODEL?.trim() || "gemini-embedding-001",
     embeddingDimensions: Number(process.env.GEMINI_EMBEDDING_DIMENSIONS?.trim() || 1536),
-    liveModel: process.env.GEMINI_LIVE_MODEL?.trim() || "gemini-2.5-flash",
+    liveModel: process.env.GEMINI_LIVE_MODEL?.trim() || "gemini-2.5-flash-native-audio-latest",
   };
 }
 
