@@ -16,11 +16,11 @@ function getGeminiConfig(): GeminiConfig {
     apiKey,
     baseUrl:
       process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com/v1beta",
-    chatModel: process.env.GEMINI_CHAT_MODEL?.trim() || "gemini-2.0-flash",
-    transcriptionModel: process.env.GEMINI_TRANSCRIBE_MODEL?.trim() || "gemini-2.0-flash",
+    chatModel: process.env.GEMINI_CHAT_MODEL?.trim() || "gemini-3.6-flash",
+    transcriptionModel: process.env.GEMINI_TRANSCRIBE_MODEL?.trim() || "gemini-3.6-flash",
     embeddingModel: process.env.GEMINI_EMBEDDING_MODEL?.trim() || "gemini-embedding-001",
     embeddingDimensions: Number(process.env.GEMINI_EMBEDDING_DIMENSIONS?.trim() || 1536),
-    liveModel: process.env.GEMINI_LIVE_MODEL?.trim() || "gemini-2.5-flash-preview-native-audio-dialog",
+    liveModel: process.env.GEMINI_LIVE_MODEL?.trim() || "gemini-2.5-flash-native-audio-latest",
   };
 }
 
@@ -222,7 +222,7 @@ export async function generateJsonCompletion(prompt: string): Promise<string> {
           role: "user",
           parts: [
             {
-              text: `You are an expert meeting analyst. Always respond with valid JSON matching the requested schema. Never wrap JSON in markdown code fences.\n\n${prompt}`,
+              text: prompt,
             },
           ],
         },

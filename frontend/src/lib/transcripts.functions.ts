@@ -152,17 +152,18 @@ export const deleteSegments = createServerFn({ method: "POST" })
 
 function parseJsonResponse(raw: string): any {
   let stripped = raw.trim();
-  // Strip markdown code fences
+  // Strip markdown code fences if present (shouldn't happen with JSON mode, but safety net)
   stripped = stripped.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
   // Try parsing directly
   try {
     return JSON.parse(stripped);
   } catch {
-    // Try to extract JSON object or array from the text
+    // Try to extract JSON object from the text
     const objMatch = stripped.match(/\{[\s\S]*\}/);
     if (objMatch) {
       try { return JSON.parse(objMatch[0]); } catch { /* continue */ }
     }
+    // Try to extract JSON array from the text
     const arrMatch = stripped.match(/\[[\s\S]*\]/);
     if (arrMatch) {
       try { return JSON.parse(arrMatch[0]); } catch { /* continue */ }
@@ -354,9 +355,13 @@ Return ONLY a JSON object: {"answer": "your answer here"}`;
       const text = parsed.answer || parsed.text || JSON.stringify(parsed);
       return { answer: typeof text === "string" ? text : String(text) };
     } catch {
-      // Fallback: use raw text response
-      const fallback = raw.replace(/^"|"$/g, "").trim();
-      return { answer: fallback || "Could not parse AI response. Please try again." };
+      // JSON mode failed — try to extract any readable text from the response
+      const cleaned = raw
+        .replace(/^```[\s\S]*?\n([\s\S]*?)\n```$/gm, "$1")
+        .replace(/^"|"$/g, "")
+        .trim();
+      if (cleaned.length > 10) return { answer: cleaned };
+      return { answer: "I couldn't generate a proper answer. Please try rephrasing your question." };
     }
   });
 

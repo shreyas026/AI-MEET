@@ -57,6 +57,7 @@ function MeetingDetail() {
   const askFn = useServerFn(askMeeting);
   const emailFn = useServerFn(emailMeetingDetails);
   const [emailing, setEmailing] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -104,16 +105,24 @@ function MeetingDetail() {
 
   async function handleDelete() {
     if (!confirm("Delete this meeting and all extracted data?")) return;
-    await delFn({ data: { id: meetingId } });
-    toast.success("Meeting deleted");
-    navigate({ to: "/meetings" });
+    try {
+      await delFn({ data: { id: meetingId } });
+      toast.success("Meeting deleted");
+      navigate({ to: "/meetings" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete meeting");
+    }
   }
 
   async function sendEmail() {
     setEmailing(true);
     try {
       const res = await emailFn({
-        data: { meetingId, baseUrl: import.meta.env.VITE_APP_URL || window.location.origin },
+        data: {
+          meetingId,
+          baseUrl: import.meta.env.VITE_APP_URL || window.location.origin,
+          toEmail: emailTo.trim() || undefined,
+        },
       });
       toast.success(`Meeting notes emailed to ${res.to}`);
     } catch (e) {
@@ -242,6 +251,13 @@ function MeetingDetail() {
               <Mail className="mr-1 h-4 w-4" />
               {emailing ? "Emailing…" : "Email me the notes"}
             </Button>
+            <Input
+              value={emailTo}
+              onChange={(e) => setEmailTo(e.target.value)}
+              placeholder="Email (optional — defaults to your account)"
+              className="max-w-[260px]"
+              type="email"
+            />
             <Button
               variant="outline"
               size="sm"
