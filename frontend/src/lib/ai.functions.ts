@@ -153,7 +153,7 @@ MEETING TITLE: ${meeting.title}
 
 TRANSCRIPT:
 """
-${transcript.content.slice(0, 60000)}
+${transcript.content.slice(0, 200000)}
 """
 
 Return ONLY a JSON object with this exact shape (no prose):

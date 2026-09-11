@@ -150,7 +150,26 @@ export const deleteSegments = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// ============ Speaker diarization for uploaded recordings ============
+function parseJsonResponse(raw: string): any {
+  let stripped = raw.trim();
+  // Strip markdown code fences
+  stripped = stripped.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+  // Try parsing directly
+  try {
+    return JSON.parse(stripped);
+  } catch {
+    // Try to extract JSON object or array from the text
+    const objMatch = stripped.match(/\{[\s\S]*\}/);
+    if (objMatch) {
+      try { return JSON.parse(objMatch[0]); } catch { /* continue */ }
+    }
+    const arrMatch = stripped.match(/\[[\s\S]*\]/);
+    if (arrMatch) {
+      try { return JSON.parse(arrMatch[0]); } catch { /* continue */ }
+    }
+    throw new Error("Could not parse AI response as JSON");
+  }
+}
 
 // Splits a raw transcript into speaker-labeled, timestamped segments by asking
 // Gemini to segment the text into turns, then distributing timestamps across
@@ -191,30 +210,35 @@ Break the transcript into natural speaker turns. Label each turn with a speaker.
 - If a turn clearly refers to one of these known participants, use that exact name: ${knownNames.join(", ") || "(none)"}.
 - Otherwise label as "Speaker 1", "Speaker 2", etc., keeping the same label for the same apparent person across turns.
 - Do not invent content. Keep the wording verbatim, but fix obvious transcription artifacts like "um", "uh", and duplicated words.
+- Return between 2 and 200 segments depending on the transcript length.
 
 MEETING TITLE: ${meeting.title}
 
 TRANSCRIPT:
 """
-${transcript.slice(0, 60000)}
+${transcript.slice(0, 200000)}
 """
 
-Return ONLY a JSON object:
+Return ONLY a JSON object (no markdown, no code fences):
 {
   "segments": [{"speaker": "...", "content": "..."}, ...]
 }`;
 
     const raw = await generateJsonCompletion(prompt);
-    const stripped = raw.replace(/^```json\s*|\s*```$/g, "").trim();
+    let parsed: any;
+    try {
+      parsed = parseJsonResponse(raw);
+    } catch {
+      throw new Error("AI returned unparseable response. Please try again.");
+    }
     let segments: Array<{ speaker: string | null; content: string }> = [];
     try {
-      const parsed = JSON.parse(stripped);
       segments = (Array.isArray(parsed) ? parsed : (parsed.segments ?? [])).map((s: any) => ({
         speaker: s.speaker ?? null,
         content: String(s.content ?? "").trim(),
       }));
     } catch {
-      throw new Error("AI returned invalid segments");
+      throw new Error("AI returned segments in unexpected format. Please try again.");
     }
     segments = segments.filter((s) => s.content.length > 0);
     if (!segments.length) throw new Error("No segments produced");
@@ -321,16 +345,18 @@ ${contextChunks.map((c, i) => `[Excerpt ${i + 1}]\n${c}`).join("\n\n")}
 
 Question: ${data.question}
 
-Answer clearly and cite which excerpt(s) your answer came from. If the answer is not in the excerpts, say you couldn't find it in this meeting.`;
+Answer clearly and cite which excerpt(s) your answer came from. If the answer is not in the excerpts, say you couldn't find it in this meeting.
+Return ONLY a JSON object: {"answer": "your answer here"}`;
 
-    const answer = await generateJsonCompletion(prompt);
-    const stripped = answer.replace(/^```json\s*|\s*```$/g, "").trim();
+    const raw = await generateJsonCompletion(prompt);
     try {
-      const parsed = JSON.parse(stripped);
+      const parsed = parseJsonResponse(raw);
       const text = parsed.answer || parsed.text || JSON.stringify(parsed);
       return { answer: typeof text === "string" ? text : String(text) };
     } catch {
-      return { answer: answer.replace(/^"|"$/g, "") };
+      // Fallback: use raw text response
+      const fallback = raw.replace(/^"|"$/g, "").trim();
+      return { answer: fallback || "Could not parse AI response. Please try again." };
     }
   });
 
@@ -369,7 +395,7 @@ export const askLiveRoom = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => {
-    const context = data.transcript.slice(-20000) || "(no transcript yet)";
+    const context = data.transcript.slice(-40000) || "(no transcript yet)";
     const prompt = `You are the AI assistant inside a live meeting. Answer the participant's question concisely based only on what has been said so far in this meeting.
 
 LIVE TRANSCRIPT SO FAR:
@@ -379,7 +405,7 @@ ${context}
 
 QUESTION: ${data.question}
 
-Answer directly. If the transcript doesn't yet contain the answer, say so clearly and suggest what to watch for.`;
+Answer directly and thoroughly. If the transcript doesn't yet contain the answer, say so clearly and suggest what to watch for.`;
 
     const answer = await generateTextCompletion(prompt);
     return { answer };

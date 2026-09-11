@@ -23,6 +23,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedMeetingsNewRouteImport } from './routes/_authenticated/meetings.new'
 import { Route as AuthenticatedMeetingsLiveRouteImport } from './routes/_authenticated/meetings.live'
 import { Route as AuthenticatedMeetingsMeetingIdRouteImport } from './routes/_authenticated/meetings.$meetingId'
+import { Route as AuthenticatedMeetingsBotRouteImport } from './routes/_authenticated/meetings.bot'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -96,6 +97,12 @@ const AuthenticatedMeetingsMeetingIdRoute =
     path: '/$meetingId',
     getParentRoute: () => AuthenticatedMeetingsRoute,
   } as any)
+const AuthenticatedMeetingsBotRoute =
+  AuthenticatedMeetingsBotRouteImport.update({
+    id: '/bot',
+    path: '/bot',
+    getParentRoute: () => AuthenticatedMeetingsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/meetings/$meetingId': typeof AuthenticatedMeetingsMeetingIdRoute
   '/meetings/live': typeof AuthenticatedMeetingsLiveRoute
   '/meetings/new': typeof AuthenticatedMeetingsNewRoute
+  '/meetings/bot': typeof AuthenticatedMeetingsBotRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -126,6 +134,7 @@ export interface FileRoutesByTo {
   '/meetings/$meetingId': typeof AuthenticatedMeetingsMeetingIdRoute
   '/meetings/live': typeof AuthenticatedMeetingsLiveRoute
   '/meetings/new': typeof AuthenticatedMeetingsNewRoute
+  '/meetings/bot': typeof AuthenticatedMeetingsBotRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -143,6 +152,7 @@ export interface FileRoutesById {
   '/_authenticated/meetings/$meetingId': typeof AuthenticatedMeetingsMeetingIdRoute
   '/_authenticated/meetings/live': typeof AuthenticatedMeetingsLiveRoute
   '/_authenticated/meetings/new': typeof AuthenticatedMeetingsNewRoute
+  '/_authenticated/meetings/bot': typeof AuthenticatedMeetingsBotRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
     | '/meetings/$meetingId'
     | '/meetings/live'
     | '/meetings/new'
+    | '/meetings/bot'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
     | '/meetings/$meetingId'
     | '/meetings/live'
     | '/meetings/new'
+    | '/meetings/bot'
   id:
     | '__root__'
     | '/'
@@ -191,6 +203,7 @@ export interface FileRouteTypes {
     | '/_authenticated/meetings/$meetingId'
     | '/_authenticated/meetings/live'
     | '/_authenticated/meetings/new'
+    | '/_authenticated/meetings/bot'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -299,6 +312,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMeetingsMeetingIdRouteImport
       parentRoute: typeof AuthenticatedMeetingsRoute
     }
+    '/_authenticated/meetings/bot': {
+      id: '/_authenticated/meetings/bot'
+      path: '/bot'
+      fullPath: '/meetings/bot'
+      preLoaderRoute: typeof AuthenticatedMeetingsBotRouteImport
+      parentRoute: typeof AuthenticatedMeetingsRoute
+    }
   }
 }
 
@@ -306,12 +326,14 @@ interface AuthenticatedMeetingsRouteChildren {
   AuthenticatedMeetingsMeetingIdRoute: typeof AuthenticatedMeetingsMeetingIdRoute
   AuthenticatedMeetingsLiveRoute: typeof AuthenticatedMeetingsLiveRoute
   AuthenticatedMeetingsNewRoute: typeof AuthenticatedMeetingsNewRoute
+  AuthenticatedMeetingsBotRoute: typeof AuthenticatedMeetingsBotRoute
 }
 
 const AuthenticatedMeetingsRouteChildren: AuthenticatedMeetingsRouteChildren = {
   AuthenticatedMeetingsMeetingIdRoute: AuthenticatedMeetingsMeetingIdRoute,
   AuthenticatedMeetingsLiveRoute: AuthenticatedMeetingsLiveRoute,
   AuthenticatedMeetingsNewRoute: AuthenticatedMeetingsNewRoute,
+  AuthenticatedMeetingsBotRoute: AuthenticatedMeetingsBotRoute,
 }
 
 const AuthenticatedMeetingsRouteWithChildren =

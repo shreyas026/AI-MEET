@@ -16,11 +16,11 @@ function getGeminiConfig(): GeminiConfig {
     apiKey,
     baseUrl:
       process.env.GEMINI_BASE_URL?.trim() || "https://generativelanguage.googleapis.com/v1beta",
-    chatModel: process.env.GEMINI_CHAT_MODEL?.trim() || "gemini-3.6-flash",
-    transcriptionModel: process.env.GEMINI_TRANSCRIBE_MODEL?.trim() || "gemini-3.6-flash",
+    chatModel: process.env.GEMINI_CHAT_MODEL?.trim() || "gemini-2.0-flash",
+    transcriptionModel: process.env.GEMINI_TRANSCRIBE_MODEL?.trim() || "gemini-2.0-flash",
     embeddingModel: process.env.GEMINI_EMBEDDING_MODEL?.trim() || "gemini-embedding-001",
     embeddingDimensions: Number(process.env.GEMINI_EMBEDDING_DIMENSIONS?.trim() || 1536),
-    liveModel: process.env.GEMINI_LIVE_MODEL?.trim() || "gemini-2.5-flash-native-audio-latest",
+    liveModel: process.env.GEMINI_LIVE_MODEL?.trim() || "gemini-2.5-flash-preview-native-audio-dialog",
   };
 }
 
@@ -32,7 +32,7 @@ export async function generateTextCompletion(prompt: string): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 1200 },
+      generationConfig: { temperature: 0.3, maxOutputTokens: 4000 },
     }),
   });
   if (!response.ok) throw new Error(`AI completion failed: ${await readAiError(response)}`);
@@ -143,17 +143,19 @@ function normalizeVector(values: number[]): number[] {
   return values.map((value) => value / magnitude);
 }
 
-export async function transcribeAudioBlob(audio: Blob, filename: string): Promise<string> {
-  const { apiKey, baseUrl, transcriptionModel } = getGeminiConfig();
-  if (audio.size > 18 * 1024 * 1024) {
-    throw new Error("Gemini inline media limit is about 20 MB. Please upload a shorter recording.");
-  }
+// Max raw audio bytes per chunk (14 MB). After base64 (~33% overhead) this stays under Gemini's 20 MB inline limit.
+const CHUNK_RAW_BYTES = 14 * 1024 * 1024;
 
-  const audioBase64 = Buffer.from(await audio.arrayBuffer()).toString("base64");
-  const mimeType = mimeTypeFromFilename(filename, audio.type);
-
+async function transcribeSingleChunk(
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  chunk: Blob,
+  mimeType: string,
+): Promise<string> {
+  const audioBase64 = Buffer.from(await chunk.arrayBuffer()).toString("base64");
   const response = await fetch(
-    apiUrl(baseUrl, `/models/${transcriptionModel}:generateContent`, apiKey),
+    apiUrl(baseUrl, `/models/${model}:generateContent`, apiKey),
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -168,20 +170,45 @@ export async function transcribeAudioBlob(audio: Blob, filename: string): Promis
             ],
           },
         ],
-        generationConfig: {
-          temperature: 0,
-        },
+        generationConfig: { temperature: 0 },
       }),
     },
   );
-
   if (!response.ok) {
     throw new Error(`Transcription failed: ${await readAiError(response)}`);
   }
+  const text = extractGeminiText(await response.json());
+  if (!text) throw new Error("Empty transcript returned from chunk");
+  return text;
+}
 
-  const transcript = extractGeminiText(await response.json());
-  if (!transcript) throw new Error("Empty transcript returned");
-  return transcript;
+/**
+ * Transcribe an audio blob. Automatically splits into chunks for files
+ * larger than Gemini's inline limit, so meetings of any length (5 hours+)
+ * are supported. Chunks are transcribed sequentially and concatenated.
+ */
+export async function transcribeAudioBlob(audio: Blob, filename: string): Promise<string> {
+  const { apiKey, baseUrl, transcriptionModel } = getGeminiConfig();
+  const mimeType = mimeTypeFromFilename(filename, audio.type);
+
+  // Small enough to send in one request
+  if (audio.size <= CHUNK_RAW_BYTES) {
+    return transcribeSingleChunk(apiKey, baseUrl, transcriptionModel, audio, mimeType);
+  }
+
+  // Split into chunks and transcribe sequentially
+  const totalChunks = Math.ceil(audio.size / CHUNK_RAW_BYTES);
+  const transcripts: string[] = [];
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_RAW_BYTES;
+    const end = Math.min(start + CHUNK_RAW_BYTES, audio.size);
+    const chunk = audio.slice(start, end, mimeType);
+    const text = await transcribeSingleChunk(apiKey, baseUrl, transcriptionModel, chunk, mimeType);
+    transcripts.push(text);
+  }
+
+  return transcripts.join("\n");
 }
 
 export async function generateJsonCompletion(prompt: string): Promise<string> {

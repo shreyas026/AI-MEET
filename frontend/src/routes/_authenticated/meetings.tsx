@@ -33,6 +33,11 @@ function MeetingsList() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
+              <Link to="/meetings/bot">
+                <Bot className="mr-1 h-4 w-4" /> Join with Bot
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link to="/meetings/live">
                 <Bot className="mr-1 h-4 w-4" /> AI live meeting
               </Link>

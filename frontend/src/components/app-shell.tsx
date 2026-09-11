@@ -22,6 +22,7 @@ import type { ReactNode } from "react";
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/meetings", label: "Meetings", icon: Mic },
+  { to: "/meetings/bot", label: "AI Bot", icon: Bot },
   { to: "/tasks", label: "Tasks", icon: ListChecks },
   { to: "/decisions", label: "Decisions", icon: MessageSquareText },
   { to: "/risks", label: "Risks", icon: ShieldAlert },
