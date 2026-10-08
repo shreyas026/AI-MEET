@@ -1,0 +1,37 @@
+﻿# CODEOWNERS
+# These users will be automatically requested for review when code changes
+
+# Global owners
+* @shreyas026
+
+# Documentation
+docs/ @shreyas026
+README.md @shreyas026
+CONTRIBUTING.md @shreyas026
+
+# Configuration
+.github/ @shreyas026
+*.yml @shreyas026
+*.yaml @shreyas026
+*.json @shreyas026
+*.toml @shreyas026
+
+# CI/CD
+.github/workflows/ @shreyas026
+
+# Python
+*.py @shreyas026
+requirements*.txt @shreyas026
+pyproject.toml @shreyas026
+
+# TypeScript/JavaScript
+*.ts @shreyas026
+*.tsx @shreyas026
+*.js @shreyas026
+*.jsx @shreyas026
+package.json @shreyas026
+tsconfig.json @shreyas026
+
+# Dart/Flutter
+*.dart @shreyas026
+pubspec.yaml @shreyas026
